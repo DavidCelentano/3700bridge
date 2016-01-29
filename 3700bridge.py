@@ -4,7 +4,6 @@ import sys
 import socket
 import select
 
-# test from pycharm
 # pads the name with null bytes at the end
 def pad(name):
         result = '\0' + name
