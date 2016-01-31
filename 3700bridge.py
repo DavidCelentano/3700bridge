@@ -25,6 +25,7 @@ if __name__ == "__main__":
        sockets.append(s)
 
     print "Bridge " + id + " starting up\n"
+    #change
 
     # Main loop
     while True:
