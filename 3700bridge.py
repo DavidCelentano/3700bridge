@@ -4,3 +4,4 @@ import sys
 import socket
 import select
 
+print(hello)
