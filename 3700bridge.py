@@ -36,7 +36,7 @@ def main(argv):
     id = argv[0]
     LAN = argv[1:]
     sockets = []
-    bpdu = BDPU(id, 0)
+    bpdu = BDPU(id, id, 0)
 
     # creates sockets and connects to them
     for x in range(len(LAN)):
@@ -62,7 +62,7 @@ def main(argv):
             full_msg = data['message']
             id = full_msg['id']
             if type == 'data':
-                print "Received Message " + id + " on port " + portno + " from " + src + " to " + dest 
+                print 'Received Message {} on port {} from {} to {}'.format(id, portno, src, dest)
             if type == 'bdpu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
