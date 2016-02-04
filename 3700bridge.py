@@ -34,6 +34,7 @@ def main(argv):
         # Calls select with all the sockets; change the timeout value (1)
         ready, ignore, ignore2 = select.select(sockets, [], [], 1)
 
+        portno = 0
         # Reads from each fo the ready sockets
         for x in ready:
             json_data = x.recv(1500)
@@ -43,10 +44,13 @@ def main(argv):
             type = data['type']
             full_msg = data['message']
             id = full_msg['id']
+            if type == 'data':
+                print "Received Message " + id + " on port " + portno + " from " + src + " to " + dest 
             if type == 'bdpu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
             print json_data
+            portno += 1
 
 if __name__ == "__main__":
     main(sys.argv[1:])
