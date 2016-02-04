@@ -4,6 +4,7 @@ import sys
 import socket
 import select
 import json
+import datetime
 
 
 # pads the name with null bytes at the end
@@ -14,12 +15,28 @@ def pad(name):
     return result
 
 
+class BDPU:
+    def __init__(self, rt, count):
+        self.time = datetime.datetime.now()
+        self.rt = rt
+        self.count = count
+
+
 def main(argv):
+
+    class BDPU:
+        def __init__(self, rt_port, rt, count):
+            self.time = datetime.datetime.now()
+            self.rt_port = rt_port
+            self.rt = rt
+            self.count = count
+
     if len(argv) < 2:
         raise ValueError('Bridge must have id and connect to LAN')
     id = argv[0]
     LAN = argv[1:]
     sockets = []
+    bpdu = BDPU(id, 0)
 
     # creates sockets and connects to them
     for x in range(len(LAN)):
@@ -49,8 +66,12 @@ def main(argv):
             if type == 'bdpu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
+                if rt < bpdu.rt:
+                    bpdu.rt = rt
+
             print json_data
             portno += 1
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
