@@ -14,21 +14,13 @@ def pad(name):
         result += '\0'
     return result
 
-
-class BDPU:
-    def __init__(self, rt, count):
-        self.time = datetime.datetime.now()
-        self.rt = rt
-        self.count = count
-
-
 def main(argv):
 
     # The stored BPDU
     class BDPU:
         def __init__(self, designated_bridge, rt_port, rt, cost):
             self.time = datetime.datetime.now()
-            self.designated_bridge = designated_bridge
+            self.id = designated_bridge
             self.rt_port = rt_port
             self.rt = rt
             self.cost = cost
@@ -58,10 +50,9 @@ def main(argv):
         # Calls select with all the sockets; change the timeout value (1)
         ready_read, ready_write, ignore2 = select.select(sockets, sockets, [], 1)
 
-        portno = 0
+        portno, works = 0, 0
         # Reads from each of the ready sockets
         for x in ready_read:
-            print 'got it'
             json_data = x.recv(1500)
             data = json.loads(json_data)
             src = data['source']
@@ -71,8 +62,7 @@ def main(argv):
             id = full_msg['id']
             if type == 'data':
                 print 'Received Message {} on port {} from {} to {}'.format(id, portno, src, dest)
-            if type == 'bdpu':
-                print "I HAVE RECIEVED A BPDU from {}".format(src)
+            elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 if rt < bpdu.rt:
@@ -83,16 +73,16 @@ def main(argv):
                     elif cost == (bpdu.cost - 1) and id == bpdu.id:
                         bpdu = BDPU(x, src, rt, cost + 1)
 
-            #print json_data
+            print json_data
             #print bpdu.rt
             #print bpdu.cost
             portno += 1
         i += 1
-        if i % 100 == 0:
+        if i % 10000 == 0:
             #print "Sending BPDU"
             for x in ready_write:
-                x.send(json.dumps({"source":id, 'dest':'ffff', 'type': 'bpdu',
-                                  "message":{'id': id, "root": bpdu.rt, 'cost': bpdu.cost}}))
+                x.send(json.dumps({'source':id, 'dest':'ffff', 'type': 'bpdu',
+                                  'message':{'id': id, 'root': bpdu.rt, 'cost': bpdu.cost}}))
 
 
 if __name__ == "__main__":
