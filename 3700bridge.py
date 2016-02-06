@@ -14,6 +14,8 @@ def pad(name):
         result += '\0'
     return result
 
+
+
 # creates bridge
 def main(argv):
 
@@ -31,20 +33,30 @@ def main(argv):
 
     id = argv[0]
     # initial lan addresses
-    lan = argv[1:]
+    lan_args = argv[1:]
     # list of ports
-    ports = {}
+    ports = []
+    # map of file descriptor to ports
+    file_no_to_port = {}
+    # map of ports to lan number
+    port_to_lan = {}
+    # map of lans to ports
+    lan_to_port = {}
+    # port activation status
     ports_on = {}
     # stored BPDU
     # assume self is the root
-    bpdu = BDPU(-1, id, id, 0)
+    bpdu = BDPU(id, 0, id, 0)
     time_out = datetime.datetime.now()
 
     # creates ports and connects to them
-    for x in range(len(lan)):
+    for x in range(len(lan_args)):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
-        s.connect(pad(lan[x]))
-        ports[s] = lan[x]
+        s.connect(pad(lan_args[x]))
+        ports.append(s)
+        port_to_lan[s] = lan_args[x]
+        file_no_to_port[s.fileno] = s
+        lan_to_port[lan_args[x]] = s
         ports_on[s] = True
 
 
@@ -54,7 +66,7 @@ def main(argv):
     # Main loop
     while True:
         # Calls select with all the ports; change the timeout value (1)
-        ready_read, ready_write, ignore2 = select.select(ports.keys(), ports.keys(), [], 1)
+        ready_read, ready_write, ignore2 = select.select(ports, ports, [], 1)
 
         # Reads from each of the ready ports
         for x in ready_read:
@@ -64,8 +76,8 @@ def main(argv):
             dest = data['dest']
             type = data['type']
             full_msg = data['message']
-            id = full_msg['id']
             if type == 'data':
+                id = full_msg['id']
                 print 'Received Message {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
             elif type == 'bpdu':
                 print 'Received BPDU {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
@@ -73,20 +85,21 @@ def main(argv):
                 cost = full_msg['cost']
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
-                        or (rt == bpdu.rt and (cost == bpdu.cost - 1) and id < bpdu.id):
-                    bpdu = BDPU(x, src, rt, cost + 1)
+                        or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.id):
+                    bpdu = BDPU(src, x.fileno(), rt, cost + 1)
 
             #print json_data
             #print bpdu.rt
             #print bpdu.cost
 
+        # BPDU send timer
         time_diff = datetime.datetime.now() - time_out
         total_milliseconds = time_diff.total_seconds() * 1000
         if total_milliseconds > 750:
             time_out = datetime.datetime.now()
             for x in ready_write:
                 x.send(json.dumps({'source':id, 'dest':'ffff', 'type': 'bpdu',
-                                   'message':{'id': id, 'root': bpdu.rt, 'cost': bpdu.cost}}))
+                                   'message':{'root': bpdu.rt, 'cost': bpdu.cost}}))
 
 
 if __name__ == "__main__":
