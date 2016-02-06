@@ -33,18 +33,18 @@ def main(argv):
     # initial lan addresses
     lan = argv[1:]
     # list of ports
-    ports = []
+    ports = {}
     ports_on = {}
     # stored BPDU
     # assume self is the root
     bpdu = BDPU(-1, id, id, 0)
     time_out = datetime.datetime.now()
 
-    # creates sockets and connects to them
+    # creates ports and connects to them
     for x in range(len(lan)):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         s.connect(pad(lan[x]))
-        ports.append(s)
+        ports[s] = lan[x]
         ports_on[s] = True
 
 
@@ -53,11 +53,10 @@ def main(argv):
 
     # Main loop
     while True:
-        # Calls select with all the sockets; change the timeout value (1)
-        ready_read, ready_write, ignore2 = select.select(ports, ports, [], 1)
+        # Calls select with all the ports; change the timeout value (1)
+        ready_read, ready_write, ignore2 = select.select(ports.keys(), ports.keys(), [], 1)
 
-        portno, works = 0, 0
-        # Reads from each of the ready sockets
+        # Reads from each of the ready ports
         for x in ready_read:
             json_data = x.recv(1500)
             data = json.loads(json_data)
@@ -67,8 +66,9 @@ def main(argv):
             full_msg = data['message']
             id = full_msg['id']
             if type == 'data':
-                print 'Received Message {} on port {} from {} to {}'.format(id, portno, src, dest)
+                print 'Received Message {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
             elif type == 'bpdu':
+                print 'Received BPDU {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 if rt < bpdu.rt \
@@ -79,7 +79,6 @@ def main(argv):
             #print json_data
             #print bpdu.rt
             #print bpdu.cost
-            portno += 1
 
         time_diff = datetime.datetime.now() - time_out
         total_milliseconds = time_diff.total_seconds() * 1000
