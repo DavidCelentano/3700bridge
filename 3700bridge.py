@@ -47,6 +47,7 @@ def main(argv):
     lan_to_port = {}
     # port activation status
     ports_on = {}
+    seen_before = []
     # stored BPDU
     # assume self is the root
     bpdu = BDPU(id, 0, id, 0)
@@ -81,6 +82,12 @@ def main(argv):
             full_msg = data['message']
             if type == 'data':
                 id = full_msg['id']
+                if id in seen_before:
+                    break
+                else:
+                    seen_before.append(id)
+                    for s in ready_write:
+                        s.send(json_data)
                 print 'Received Message {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
             elif type == 'bpdu':
                 print 'Received BPDU {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
