@@ -19,7 +19,6 @@ def main(argv):
     # The stored BPDU
     class BDPU:
         def __init__(self, designated_bridge, rt_port, rt, cost):
-            self.time = datetime.datetime.now()
             self.id = designated_bridge
             self.rt_port = rt_port
             self.rt = rt
@@ -34,7 +33,7 @@ def main(argv):
     sockets = []
     # assume self is the host
     bpdu = BDPU(-1, id, id, 0)
-    i = 0
+    time_out = datetime.datetime.now()
 
     # creates sockets and connects to them
     for x in range(len(lan)):
@@ -65,24 +64,23 @@ def main(argv):
             elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
-                if rt < bpdu.rt:
+                if rt < bpdu.rt \
+                        or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
+                        or (rt == bpdu.rt and (cost == bpdu.cost - 1) and id < bpdu.id):
                     bpdu = BDPU(x, src, rt, cost + 1)
-                elif rt == bpdu.rt:
-                    if cost < (bpdu.cost - 1):
-                        bpdu = BDPU(x, src, rt, cost + 1)
-                    elif cost == (bpdu.cost - 1) and id == bpdu.id:
-                        bpdu = BDPU(x, src, rt, cost + 1)
 
             print json_data
             #print bpdu.rt
             #print bpdu.cost
             portno += 1
-        i += 1
-        if i % 10000 == 0:
-            #print "Sending BPDU"
+
+        time_diff = datetime.datetime.now() - time_out
+        total_milliseconds = time_diff.total_seconds() * 1000
+        if total_milliseconds > 750:
+            time_out = datetime.datetime.now()
             for x in ready_write:
                 x.send(json.dumps({'source':id, 'dest':'ffff', 'type': 'bpdu',
-                                  'message':{'id': id, 'root': bpdu.rt, 'cost': bpdu.cost}}))
+                                   'message':{'id': id, 'root': bpdu.rt, 'cost': bpdu.cost}}))
 
 
 if __name__ == "__main__":
