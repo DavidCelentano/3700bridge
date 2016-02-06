@@ -14,9 +14,10 @@ def pad(name):
         result += '\0'
     return result
 
+# creates bridge
 def main(argv):
 
-    # The stored BPDU
+    # A BPDU
     class BDPU:
         def __init__(self, designated_bridge, rt_port, rt, cost):
             self.id = designated_bridge
@@ -29,9 +30,13 @@ def main(argv):
         raise ValueError('Bridge must have id and connect to LAN')
 
     id = argv[0]
+    # initial lan addresses
     lan = argv[1:]
-    sockets = []
-    # assume self is the host
+    # list of ports
+    ports = []
+    ports_on = {}
+    # stored BPDU
+    # assume self is the root
     bpdu = BDPU(-1, id, id, 0)
     time_out = datetime.datetime.now()
 
@@ -39,7 +44,9 @@ def main(argv):
     for x in range(len(lan)):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         s.connect(pad(lan[x]))
-        sockets.append(s)
+        ports.append(s)
+        ports_on[s] = True
+
 
     # ready
     print "Bridge " + id + " starting up\n"
@@ -47,7 +54,7 @@ def main(argv):
     # Main loop
     while True:
         # Calls select with all the sockets; change the timeout value (1)
-        ready_read, ready_write, ignore2 = select.select(sockets, sockets, [], 1)
+        ready_read, ready_write, ignore2 = select.select(ports, ports, [], 1)
 
         portno, works = 0, 0
         # Reads from each of the ready sockets
@@ -69,7 +76,7 @@ def main(argv):
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and id < bpdu.id):
                     bpdu = BDPU(x, src, rt, cost + 1)
 
-            print json_data
+            #print json_data
             #print bpdu.rt
             #print bpdu.cost
             portno += 1
