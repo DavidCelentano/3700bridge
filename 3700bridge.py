@@ -14,7 +14,10 @@ def pad(name):
         result += '\0'
     return result
 
-
+# form the bpdu to be sent
+def form_bpdu(id, rt, cost):
+    return json.dumps({'source': id, 'dest': 'ffff', 'type': 'bpdu',
+                       'message':{'root': rt, 'cost': cost}})
 
 # creates bridge
 def main(argv):
@@ -98,8 +101,7 @@ def main(argv):
         if total_milliseconds > 750:
             time_out = datetime.datetime.now()
             for x in ready_write:
-                x.send(json.dumps({'source':id, 'dest':'ffff', 'type': 'bpdu',
-                                   'message':{'root': bpdu.rt, 'cost': bpdu.cost}}))
+                x.send(form_bpdu(id, bpdu.rt, bpdu.cost))
 
 
 if __name__ == "__main__":
