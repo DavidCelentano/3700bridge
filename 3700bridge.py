@@ -47,6 +47,8 @@ def main(argv):
     lan_to_port = {}
     # port activation status
     ports_on = {}
+    # map of sources to ports
+    src_to_port = {}
     # temporary replacement for forwarding table and loops
     seen_before = []
     # stored BPDU
@@ -94,9 +96,16 @@ def main(argv):
                 msg_id = full_msg['id']
                 if msg_id in seen_before:
                     break
-                else:
-                    # send message back out (fix when forwarding table is complete)
+                if dest in src_to_port:
+                    #TODO needs work
                     seen_before.append(msg_id)
+                    if ports_on[src_to_port[dest]]:
+                        src_to_port[dest].send(json_data)
+                    break
+                else:
+                    seen_before.append(msg_id)
+                    # need to add lifespan
+                    src_to_port[src] = x
                     for s in ready_write:
                         if ports_on[s]:
                             s.send(json_data)
