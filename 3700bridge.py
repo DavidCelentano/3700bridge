@@ -67,7 +67,10 @@ def main(argv):
 
 
     # ready
-    print 'Bridge ' + my_id + ' starting up' + 'The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
+    print 'Bridge ' + my_id + ' starting up' + ' The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
+    ready_read, ready_write, ignore2 = select.select(ports, ports, [], 1)
+    for r in ready_write:
+        r.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
 
     # Main loop
     while True:
@@ -82,14 +85,21 @@ def main(argv):
             dest = data['dest']
             type = data['type']
             full_msg = data['message']
-            if type == 'data':
+            # if send a message to self, close loop
+            #if src == my_id:
+            #    ports_on[x] = False
+            #    print ports_on
+            #    continue
+            if type == 'data' and ports_on[x]:
                 msg_id = full_msg['id']
                 if msg_id in seen_before:
                     break
                 else:
+                    # send message back out (fix when forwarding table is complete)
                     seen_before.append(msg_id)
                     for s in ready_write:
-                        s.send(json_data)
+                        if ports_on[s]:
+                            s.send(json_data)
                 #print 'Received Message {} on port {} from {} to {}'.format(msg_id, x.fileno(), src, dest)
             elif type == 'bpdu':
                 #print 'Received BPDU {} on port {} from {} to {}'.format(msg_id, x.fileno(), src, dest)
@@ -99,8 +109,14 @@ def main(argv):
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.id):
                     bpdu = BPDU(src, x.fileno(), rt, cost + 1)
-                    print "new bpdu"
-                print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.id)
+                    for x in ready_write:
+                       x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
+                    time_out = datetime.datetime.now()
+                    #print "new bpdu"
+                if cost == bpdu.cost and src < bpdu.id:
+                    #ports_on[x] = False
+                    print "enabled false!!!!!!!!!!!!!!!!!!"
+                #print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.id)
 
             #print json_data
             #print bpdu.rt
