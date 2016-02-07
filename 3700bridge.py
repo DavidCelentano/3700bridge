@@ -23,7 +23,7 @@ def form_bpdu(id, rt, cost):
 def main(argv):
 
     # A BPDU
-    class BDPU:
+    class BPDU:
         def __init__(self, designated_bridge, rt_port, rt, cost):
             self.id = designated_bridge
             self.rt_port = rt_port
@@ -34,7 +34,7 @@ def main(argv):
     if len(argv) < 2:
         raise ValueError('Bridge must have id and connect to LAN')
 
-    id = argv[0]
+    my_id = argv[0]
     # initial lan addresses
     lan_args = argv[1:]
     # list of ports
@@ -47,10 +47,12 @@ def main(argv):
     lan_to_port = {}
     # port activation status
     ports_on = {}
+    # temporary replacement for forwarding table and loops
     seen_before = []
     # stored BPDU
     # assume self is the root
-    bpdu = BDPU(id, 0, id, 0)
+    bpdu = BPDU(my_id, 0, my_id, 0)
+    # time before sending another bpdu
     time_out = datetime.datetime.now()
 
     # creates ports and connects to them
@@ -65,7 +67,7 @@ def main(argv):
 
 
     # ready
-    print "Bridge " + id + " starting up\n"
+    print 'Bridge ' + my_id + ' starting up' + 'The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
 
     # Main loop
     while True:
@@ -81,22 +83,24 @@ def main(argv):
             type = data['type']
             full_msg = data['message']
             if type == 'data':
-                id = full_msg['id']
-                if id in seen_before:
+                msg_id = full_msg['id']
+                if msg_id in seen_before:
                     break
                 else:
-                    seen_before.append(id)
+                    seen_before.append(msg_id)
                     for s in ready_write:
                         s.send(json_data)
-                print 'Received Message {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
+                #print 'Received Message {} on port {} from {} to {}'.format(msg_id, x.fileno(), src, dest)
             elif type == 'bpdu':
-                print 'Received BPDU {} on port {} from {} to {}'.format(id, x.fileno(), src, dest)
+                #print 'Received BPDU {} on port {} from {} to {}'.format(msg_id, x.fileno(), src, dest)
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.id):
-                    bpdu = BDPU(src, x.fileno(), rt, cost + 1)
+                    bpdu = BPDU(src, x.fileno(), rt, cost + 1)
+                    print "new bpdu"
+                print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.id)
 
             #print json_data
             #print bpdu.rt
@@ -108,7 +112,7 @@ def main(argv):
         if total_milliseconds > 750:
             time_out = datetime.datetime.now()
             for x in ready_write:
-                x.send(form_bpdu(id, bpdu.rt, bpdu.cost))
+                x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
 
 
 if __name__ == "__main__":
