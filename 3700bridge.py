@@ -45,6 +45,8 @@ def main(argv):
     port_to_lan = {}
     # map of lans to ports
     lan_to_port = {}
+    # map of sources to times
+    src_timeout = {}
     # port activation status
     ports_on = {}
     # map of sources to ports
@@ -87,31 +89,23 @@ def main(argv):
             dest = data['dest']
             type = data['type']
             full_msg = data['message']
-            # if send a message to self, close loop
-            #if src == my_id:
-            #    ports_on[x] = False
-            #    print ports_on
-            #    continue
             if type == 'data' and ports_on[x]:
                 msg_id = full_msg['id']
-                if msg_id in seen_before:
-                    break
-                if dest in src_to_port:
-                    #TODO needs work
-                    seen_before.append(msg_id)
+                if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() < 4:
                     if ports_on[src_to_port[dest]]:
-                        src_to_port[dest].send(json_data)
-                    break
+                        if src_to_port[dest] in ready_write:
+                            print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest])
+                            src_to_port[dest].send(json_data)
+                            break
                 else:
-                    seen_before.append(msg_id)
-                    # need to add lifespan
                     src_to_port[src] = x
+                    src_timeout[src] = datetime.datetime.now()
+                    print 'Broadcasting message {} to all ports'.format(msg_id)
                     for s in ready_write:
-                        if ports_on[s]:
+                        if ports_on[s] and not(s is x):
                             s.send(json_data)
-                #print 'Received Message {} on port {} from {} to {}'.format(msg_id, x.fileno(), src, dest)
+
             elif type == 'bpdu':
-                #print 'Received BPDU {} on port {} from {} to {}'.format(msg_id, x.fileno(), src, dest)
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 if rt < bpdu.rt \
