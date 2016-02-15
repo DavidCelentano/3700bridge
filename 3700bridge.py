@@ -14,10 +14,12 @@ def pad(name):
         result += '\0'
     return result
 
+
 # form the bpdu to be sent
 def form_bpdu(id, rt, cost):
     return json.dumps({'source': id, 'dest': 'ffff', 'type': 'bpdu',
                        'message':{'root': rt, 'cost': cost}})
+
 
 # creates bridge
 def main(argv):
@@ -61,6 +63,9 @@ def main(argv):
 
     # creates ports and connects to them
     for x in range(len(lan_args)):
+        # if connected to same LAN multiple times
+        if lan_args[x] in lan_to_port:
+            continue
         s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         s.connect(pad(lan_args[x]))
         ports.append(s)
@@ -68,7 +73,6 @@ def main(argv):
         file_no_to_port[s.fileno] = s
         lan_to_port[lan_args[x]] = s
         ports_on[s] = True
-
 
     # ready
     print 'Bridge ' + my_id + ' starting up' + ' The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
@@ -104,28 +108,32 @@ def main(argv):
                     for s in ready_write:
                         if ports_on[s] and not(s is x):
                             s.send(json_data)
-
+            # received BPDU
             elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
+                # if more correct BPDU
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.id):
+                    # change own BPDU state
                     bpdu = BPDU(src, x.fileno(), rt, cost + 1)
+                    # send out update to all BPDU neighbors
                     for x in ready_write:
                        x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
+                    # reset timeout timer
                     time_out = datetime.datetime.now()
-                    #print "new bpdu"
-                if cost == bpdu.cost and src < bpdu.id:
+                # figure out what I meant with this
+                #if cost == bpdu.cost and src < bpdu.id:
                     #ports_on[x] = False
-                    print "enabled false!!!!!!!!!!!!!!!!!!"
+                    #print "enabled false!!!!!!!!!!!!!!!!!!"
                 #print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.id)
 
             #print json_data
             #print bpdu.rt
             #print bpdu.cost
 
-        # BPDU send timer
+        # BPDU send timer (if BPDU times out)
         time_diff = datetime.datetime.now() - time_out
         total_milliseconds = time_diff.total_seconds() * 1000
         if total_milliseconds > 750:
