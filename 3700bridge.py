@@ -77,7 +77,7 @@ def main(argv):
         # associate LAN with socket obj
         lan_to_port[lan_args[x]] = s
         # seen before
-        #seen_before = []
+        seen_before = []
         # by default, keep port open
         ports_on[s] = True
 
@@ -120,9 +120,9 @@ def main(argv):
             if type == 'data' and ports_on[x]:
                 # random id for message
                 msg_id = full_msg['id']
-                #if msg_id in seen_before:
-                #    continue
-                #seen_before.append(msg_id)
+                if msg_id in seen_before:
+                    continue
+                seen_before.append(msg_id)
                 src_to_port[src] = x
                 src_timeout[src] = datetime.datetime.now()
                 # if destination in forwarding table, and table is up-to-date
@@ -130,12 +130,14 @@ def main(argv):
                         and ports_on[src_to_port[dest]] and src_to_port[dest] in ready_write:
                     print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest])
                     src_to_port[dest].send(json_data)
+                    continue
                 # destination is not currently in forwarding table
                 else:
                     print 'Broadcasting message {} to all ports'.format(msg_id)
                     for s in ready_write:
                         if ports_on[s] and not(s is x):
                             s.send(json_data)
+                            continue
             # received BPDU
             elif type == 'bpdu':
                 rt = full_msg['root']
@@ -146,6 +148,8 @@ def main(argv):
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.des_bridge):
                     # change own BPDU state
                     bpdu = BPDU(src, x.fileno(), rt, cost + 1)
+                    src_to_port = {}
+                    src_timeout = {}
                     # send out update to all BPDU neighbors
                     for x in ready_write:
                        x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
@@ -154,14 +158,9 @@ def main(argv):
                 # determines the designated bridge on the LAN's
                 # if equal distance to root and
                 #elif cost == bpdu.cost and src < my_id:
-                    #ports_on[x] = False
-                    #print "enabled false!!!!!!!!!!!!!!!!!!"
-                #print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.id)
-
-            #print json_data
-            #print bpdu.rt
-            #print bpdu.cost
-
+                #    ports_on[x] = False
+                #    print "enabled false!!!!!!!!!!!!!!!!!!"
+                print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.des_bridge)
 
 
 
