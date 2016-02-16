@@ -26,8 +26,8 @@ def main(argv):
 
     # A BPDU
     class BPDU:
-        def __init__(self, des_bridge, rt_port, rt, cost):
-            self.des_bridge = des_bridge
+        def __init__(self, bridge_id, rt_port, rt, cost):
+            self.bridge_id = bridge_id
             self.rt_port = rt_port
             self.rt = rt
             self.cost = cost
@@ -54,6 +54,8 @@ def main(argv):
     ports_on = {}
     # map of sources to ports
     src_to_port = {}
+    # port to designated bridge
+    port_to_des_bridge = {}
 
     # stored BPDU: assume self is the root
     bpdu = BPDU(my_id, 0, my_id, 0)
@@ -77,9 +79,10 @@ def main(argv):
         # associate LAN with socket obj
         lan_to_port[lan_args[x]] = s
         # seen before
-        seen_before = []
+        #seen_before = []
         # by default, keep port open
         ports_on[s] = True
+        port_to_des_bridge[s] = my_id
 
     # ready print
     print 'Bridge ' + my_id + ' starting up' + ' The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
@@ -93,7 +96,7 @@ def main(argv):
     while True:
         # Calls select with all the ports; change the timeout value (1)
         # Reinitialize list of ready ports
-        ready_read, ready_write, ignore2 = select.select(ports, ports, [], 1)
+        ready_read, ready_write, ignore2 = select.select(ports, ports, [], 0.1)
 
         # BPDU send timer (if BPDU times out)
         time_diff = datetime.datetime.now() - time_out
@@ -120,36 +123,45 @@ def main(argv):
             if type == 'data' and ports_on[x]:
                 # random id for message
                 msg_id = full_msg['id']
-                if msg_id in seen_before:
-                    continue
-                seen_before.append(msg_id)
+              #  if msg_id in seen_before:
+              #      continue
+                #seen_before.append(msg_id)
                 src_to_port[src] = x
                 src_timeout[src] = datetime.datetime.now()
                 # if destination in forwarding table, and table is up-to-date
                 if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() <= 5 \
                         and ports_on[src_to_port[dest]] and src_to_port[dest] in ready_write:
-                    print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest])
+                    print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest].fileno)
                     src_to_port[dest].send(json_data)
                     continue
                 # destination is not currently in forwarding table
                 else:
-                    print 'Broadcasting message {} to all ports'.format(msg_id)
+                    k = 0
                     for s in ready_write:
                         if ports_on[s] and not(s is x):
+                            k += 1
                             s.send(json_data)
+                            if k == 0:
+                                print 'Not forwarding message {}'.format(msg_id)
+                            else:
+                                print 'Broadcasting message {} to all ports'.format(msg_id)
                             continue
             # received BPDU
             elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 # if more correct BPDU
+                if port_to_lan[x] != port_to_lan[bpdu.rt_port] and (cost < bpdu.cost or (cost == bpdu.cost and src < my_id)):
+                    ports_on[x] = False
+
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
-                        or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.des_bridge):
+                        or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
                     # change own BPDU state
-                    bpdu = BPDU(src, x.fileno(), rt, cost + 1)
+                    bpdu = BPDU(src, x, rt, cost + 1)
                     src_to_port = {}
                     src_timeout = {}
+                    #port_to_des_bridge[x] = bpdu.bridge_id
                     # send out update to all BPDU neighbors
                     for x in ready_write:
                        x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
