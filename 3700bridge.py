@@ -75,7 +75,7 @@ def main(argv):
         # associate socket obj with LAN
         port_to_lan[s] = lan_args[x]
         # for opposite of s.fileno
-        file_no_to_port[s.fileno] = s
+        file_no_to_port[s.fileno()] = s
         # associate LAN with socket obj
         lan_to_port[lan_args[x]] = s
         # seen before
@@ -131,7 +131,7 @@ def main(argv):
                 # if destination in forwarding table, and table is up-to-date
                 if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() <= 5 \
                         and ports_on[src_to_port[dest]] and src_to_port[dest] in ready_write:
-                    print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest].fileno)
+                    print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest].fileno())
                     src_to_port[dest].send(json_data)
                     continue
                 # destination is not currently in forwarding table
