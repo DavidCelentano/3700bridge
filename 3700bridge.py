@@ -92,6 +92,10 @@ def main(argv):
     for r in ready_write:
         r.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
 
+    # for initial BPDU configuration
+    port_to_lan[0] = 'this is a mistake'
+    lan_to_port['this is a mistake'] = 0
+
     # Main loop
     while True:
         # Calls select with all the ports; change the timeout value (1)
@@ -153,7 +157,6 @@ def main(argv):
                 # if more correct BPDU
                 if port_to_lan[x] != port_to_lan[bpdu.rt_port] and (cost < bpdu.cost or (cost == bpdu.cost and src < my_id)):
                     ports_on[x] = False
-
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
@@ -172,7 +175,7 @@ def main(argv):
                 #elif cost == bpdu.cost and src < my_id:
                 #    ports_on[x] = False
                 #    print "enabled false!!!!!!!!!!!!!!!!!!"
-                print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.des_bridge)
+                print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.bridge_id)
 
 
 
