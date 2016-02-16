@@ -79,7 +79,7 @@ def main(argv):
         # associate LAN with socket obj
         lan_to_port[lan_args[x]] = s
         # seen before
-        #seen_before = []
+        seen_before = []
         # by default, keep port open
         ports_on[s] = True
         port_to_des_bridge[s] = my_id
@@ -127,17 +127,16 @@ def main(argv):
             if type == 'data' and ports_on[x]:
                 # random id for message
                 msg_id = full_msg['id']
-              #  if msg_id in seen_before:
-              #      continue
+                if msg_id in seen_before:
+                    continue
                 #seen_before.append(msg_id)
                 src_to_port[src] = x
                 src_timeout[src] = datetime.datetime.now()
                 # if destination in forwarding table, and table is up-to-date
                 if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() <= 5 \
                         and ports_on[src_to_port[dest]] and src_to_port[dest] in ready_write:
-                    print 'Forwarding message {} to port {}'.format(msg_id, src_to_port[dest].fileno())
+                    print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_to_port[src].fileno(), src_to_port[dest].fileno())
                     src_to_port[dest].send(json_data)
-                    continue
                 # destination is not currently in forwarding table
                 else:
                     k = 0
@@ -145,18 +144,17 @@ def main(argv):
                         if ports_on[s] and not(s is x):
                             k += 1
                             s.send(json_data)
-                            if k == 0:
-                                print 'Not forwarding message {}'.format(msg_id)
-                            else:
-                                print 'Broadcasting message {} to all ports'.format(msg_id)
-                            continue
+                    if k == 0:
+                        print 'Not forwarding message {} from port {}'.format(msg_id, src_to_port[src].fileno())
+                    else:
+                        print 'Broadcasting message {} to all ports except {}'.format(msg_id, src_to_port[src].fileno())
             # received BPDU
             elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 # if more correct BPDU
                 if port_to_lan[x] != port_to_lan[bpdu.rt_port] and (cost < bpdu.cost or (cost == bpdu.cost and src < my_id)):
-                    ports_on[x] = False
+                   ports_on[x] = False
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
@@ -164,19 +162,12 @@ def main(argv):
                     bpdu = BPDU(src, x, rt, cost + 1)
                     src_to_port = {}
                     src_timeout = {}
-                    #port_to_des_bridge[x] = bpdu.bridge_id
+                    port_to_des_bridge[x] = bpdu.bridge_id
                     # send out update to all BPDU neighbors
                     for x in ready_write:
                        x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
                     # reset timeout timer
                     time_out = datetime.datetime.now()
-                # determines the designated bridge on the LAN's
-                # if equal distance to root and
-                #elif cost == bpdu.cost and src < my_id:
-                #    ports_on[x] = False
-                #    print "enabled false!!!!!!!!!!!!!!!!!!"
-                print 'The root is {} and the cost is {} and my designated bridge is {}'.format(bpdu.rt, bpdu.cost, bpdu.bridge_id)
-
 
 
 if __name__ == "__main__":
