@@ -40,6 +40,8 @@ def main(argv):
     my_id = argv[0]
     # print or not
     print_toggle = True
+    if my_id == 'ff1a':
+        print_toggle = True
     # initial lan addresses
     lan_args = argv[1:]
     # list of ports
@@ -145,9 +147,9 @@ def main(argv):
                 # random id for message
                 msg_id = full_msg['id']
                 # the cheap way out
-                if msg_id in seen_before:
+                '''if msg_id in seen_before:
                     continue
-                seen_before.append(msg_id)
+                seen_before.append(msg_id)'''
                 # record in forwarding table
                 src_to_port[src] = read_port
                 # reset timer on host
@@ -192,17 +194,21 @@ def main(argv):
                     # reset timeout timer
                     time_out = datetime.datetime.now()
                     des_bridge_flags[read_port] = False
-                elif (rt == bpdu.rt and (cost == bpdu.cost - 1) and src >= bpdu.bridge_id):
+                    if print_toggle:
+                        print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
+                elif (rt == bpdu.rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
                     des_bridge_flags[read_port] = False
+                    if print_toggle:
+                        print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
                 else:
                     if print_toggle:
-                        print 'I am the designated bridge for LAN {}'.format(port_to_lan[read_port])
+                        print 'I am the designated bridge for LAN {} my: {} {} yours: {} {}'.format(port_to_lan[read_port], bpdu.cost, my_id, cost, src)
 
-    '''for port in ports:
+    for port in ports:
         if not(des_bridge_flags[port]) and port != bpdu.rt_port:
             ports_on[port] = False
             if print_toggle:
-                print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])'''
+                print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
 
 if __name__ == "__main__":
     main(sys.argv[1:])
