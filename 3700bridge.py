@@ -58,11 +58,12 @@ def main(argv):
     ports_on = {}
     # bridge timeouts
     bridge_timeout = {}
-
     # stored BPDU: assume self is the root
     bpdu = BPDU(my_id, 0, my_id, 0)
     # timer for sending another bpdu
     time_out = datetime.datetime.now()
+    # designated bridge flags
+    des_bridge_flags = {}
 
     # creates all ports and connects to them
     for lan_index in (x for x in range(len(lan_args)) if not (lan_args[x][-1:] in lan_to_port)):
@@ -78,6 +79,7 @@ def main(argv):
         lan_to_port[lan[-1:]] = s
         # by default, keep port open
         ports_on[s] = True
+        des_bridge_flags[s] = True
 
     # ready print
     print 'Bridge ' + my_id + ' starting up' + ' The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
@@ -107,9 +109,11 @@ def main(argv):
         # reset if necessary
         if reset_count > 0:
             bpdu = BPDU(my_id, 0, my_id, 0)
-            ports = [True for port in ports]
             src_to_port = {}
             src_timeout = {}
+            for key in des_bridge_flags.keys():
+                des_bridge_flags[key] = True
+                ports_on[key] = True
             time_out = datetime.datetime.now()
             for send_bpdu_port in ports:
                 send_bpdu_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
@@ -141,16 +145,16 @@ def main(argv):
                 # random id for message
                 msg_id = full_msg['id']
                 # the cheap way out
-                '''if msg_id in seen_before:
+                if msg_id in seen_before:
                     continue
-                seen_before.append(msg_id)'''
+                seen_before.append(msg_id)
                 # record in forwarding table
                 src_to_port[src] = read_port
                 # reset timer on host
-                src_timeout[src] = datetime.datetime.now()
-                src_time_diff = (datetime.datetime.now() - src_timeout[dest]).total_seconds()
+                now = datetime.datetime.now()
+                src_timeout[src] = now
                 # if destination in forwarding table, and table is up-to-date, and port is open
-                if dest in src_to_port and src_time_diff <= 5 and ports_on[src_to_port[dest]]:
+                if dest in src_to_port and (now - src_timeout[dest]).total_seconds() <= 5 and ports_on[src_to_port[dest]]:
                     dest_port = src_to_port[dest]
                     if print_toggle:
                         src_no = src_to_port[src].fileno()
@@ -180,8 +184,6 @@ def main(argv):
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
                     # change own BPDU state
                     bpdu = BPDU(src, read_port, rt, cost + 1)
-                    # reset closed ports
-                    ports_on = [True for port in ports]
                     src_to_port = {}
                     src_timeout = {}
                     # send out update to all BPDU neighbors
@@ -189,11 +191,18 @@ def main(argv):
                        every_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
                     # reset timeout timer
                     time_out = datetime.datetime.now()
-                # port closing
+                    des_bridge_flags[read_port] = False
+                elif (rt == bpdu.rt and (cost == bpdu.cost - 1) and src >= bpdu.bridge_id):
+                    des_bridge_flags[read_port] = False
+                else:
+                    if print_toggle:
+                        print 'I am the designated bridge for LAN {}'.format(port_to_lan[read_port])
 
-
-
-
+    '''for port in ports:
+        if not(des_bridge_flags[port]) and port != bpdu.rt_port:
+            ports_on[port] = False
+            if print_toggle:
+                print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])'''
 
 if __name__ == "__main__":
     main(sys.argv[1:])
