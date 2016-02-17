@@ -187,6 +187,8 @@ def main(argv):
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
                     # change own BPDU state
                     bpdu = BPDU(src, read_port, rt, cost + 1)
+                    print 'New root: {}/{}'.format(bpdu.bridge_id, bpdu.rt)
+                    print 'Root port: {}/{}'.format(bpdu.bridge_id, bpdu.rt_port)
                     src_to_port = {}
                     src_timeout = {}
                     # send out update to all BPDU neighbors
@@ -196,24 +198,24 @@ def main(argv):
                     time_out = datetime.datetime.now()
                     des_bridge_flags[read_port] = False
                     if print_toggle:
-                        print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
+                        #print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
                 elif (rt == bpdu.rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
                     des_bridge_flags[read_port] = False
                     if print_toggle:
-                        print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
+                        #print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
                 else:
                     if print_toggle:
-                        print 'I am the designated bridge for LAN {} my: {} {} yours: {} {}'.format(port_to_lan[read_port], bpdu.cost, my_id, cost, src)
+                        print 'Designated port: {}/{}'.format(bpdu.bridge_id, read_port)
 
         for port in ports:
             if not(des_bridge_flags[port]) and port != bpdu.rt_port:
                 ports_on[port] = False
                 if print_toggle:
-                    print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
+                    print 'Disabled port: {}/{}'.format(bpdu.bridge_id, read_port)
             else:
                 ports_on[port] = True
                 if print_toggle:
-                    print 'not closing port {} to LAN {} des bridge: {}'.format(port.fileno(), port_to_lan[port], des_bridge_flags[port])
+                    #print 'not closing port {} to LAN {} des bridge: {}'.format(port.fileno(), port_to_lan[port], des_bridge_flags[port])
 
 if __name__ == "__main__":
     main(sys.argv[1:])
