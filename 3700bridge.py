@@ -63,8 +63,8 @@ def main(argv):
     time_out = datetime.datetime.now()
 
     # creates all ports and connects to them
-    for x in range(len(lan_args)):
-        lan = lan_args[x]
+    for lan_index in range(len(lan_args)):
+        lan = lan_args[lan_index]
         # if connected to same LAN multiple times, disable extras
         if lan[-1:] in lan_to_port:
             continue
@@ -101,13 +101,13 @@ def main(argv):
         total_milliseconds = time_diff.total_seconds() * 1000
         if total_milliseconds > 750:
             time_out = datetime.datetime.now()
-            for x in ports:
-                x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
+            for send_port in ports:
+                send_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
 
         # Reads from each of the ready ports
-        for x in ready_read:
+        for read_port in ready_read:
             # JSON decoding
-            json_data = x.recv(1500)
+            json_data = read_port.recv(1500)
             data = json.loads(json_data)
             # sent from
             src = data['source']
@@ -118,13 +118,13 @@ def main(argv):
             # contents of message
             full_msg = data['message']
             # if type is host data
-            if type == 'data' and ports_on[x]:
+            if type == 'data' and ports_on[read_port]:
                 # random id for message
                 msg_id = full_msg['id']
                 if msg_id in seen_before:
                     continue
                 seen_before.append(msg_id)
-                src_to_port[src] = x
+                src_to_port[src] = read_port
                 src_timeout[src] = datetime.datetime.now()
                 # if destination in forwarding table, and table is up-to-date
                 if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() <= 5 \
@@ -137,7 +137,7 @@ def main(argv):
                 else:
                     k = 0
                     for port in ports:
-                        if ports_on[port] and port != x:
+                        if ports_on[port] and port != read_port:
                             k += 1
                             port.send(json_data)
                     if k == 0:
@@ -154,12 +154,12 @@ def main(argv):
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
                     # change own BPDU state
-                    bpdu = BPDU(src, x, rt, cost + 1)
+                    bpdu = BPDU(src, read_port, rt, cost + 1)
                     src_to_port = {}
                     src_timeout = {}
                     # send out update to all BPDU neighbors
-                    for x in ports:
-                       x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
+                    for every_port in ports:
+                       every_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
                     # reset timeout timer
                     time_out = datetime.datetime.now()
                 # port closing
