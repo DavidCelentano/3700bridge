@@ -39,9 +39,9 @@ def main(argv):
     # bridge id
     my_id = argv[0]
     # print or not
-    print_toggle = True
+    print_toggle = False
     if my_id == 'ff1a':
-        print_toggle = True
+        print_toggle = False
     # initial lan addresses
     lan_args = argv[1:]
     # list of ports
@@ -162,7 +162,8 @@ def main(argv):
                         src_no = src_to_port[src].fileno()
                         dest_no = dest_port.fileno()
                         print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_no, dest_no)
-                    dest_port.send(json_data)
+                    if dest_port != read_port:
+                        dest_port.send(json_data)
                 # destination is not currently in forwarding table
                 else:
                     k = 0
@@ -204,11 +205,15 @@ def main(argv):
                     if print_toggle:
                         print 'I am the designated bridge for LAN {} my: {} {} yours: {} {}'.format(port_to_lan[read_port], bpdu.cost, my_id, cost, src)
 
-    for port in ports:
-        if not(des_bridge_flags[port]) and port != bpdu.rt_port:
-            ports_on[port] = False
-            if print_toggle:
-                print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
+        for port in ports:
+            if not(des_bridge_flags[port]) and port != bpdu.rt_port:
+                ports_on[port] = False
+                if print_toggle:
+                    print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
+            else:
+                ports_on[port] = True
+                if print_toggle:
+                    print 'not closing port {} to LAN {} des bridge: {}'.format(port.fileno(), port_to_lan[port], des_bridge_flags[port])
 
 if __name__ == "__main__":
     main(sys.argv[1:])
