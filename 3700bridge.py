@@ -56,6 +56,8 @@ def main(argv):
     src_to_port = {}
     # port activation status
     ports_on = {}
+    # bridge timeouts
+    bridge_timeout = {}
 
     # stored BPDU: assume self is the root
     bpdu = BPDU(my_id, 0, my_id, 0)
@@ -63,11 +65,8 @@ def main(argv):
     time_out = datetime.datetime.now()
 
     # creates all ports and connects to them
-    for lan_index in range(len(lan_args)):
+    for lan_index in (x for x in range(len(lan_args)) if not (lan_args[x][-1:] in lan_to_port)):
         lan = lan_args[lan_index]
-        # if connected to same LAN multiple times, disable extras
-        if lan[-1:] in lan_to_port:
-            continue
         # connect to port
         s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         s.connect(pad(lan))
@@ -96,10 +95,26 @@ def main(argv):
         # Reinitialize list of ready ports
         ready_read, ignore, ignore2 = select.select(ports, ports, [], 0.1)
 
-        # BPDU send timer (if BPDU times out)
+        # timeout on all other BPDU's
+        reset_count = 0
+        for key in bridge_timeout.keys():
+            time_stamp = datetime.datetime.now()
+            time_diff = (time_stamp - bridge_timeout[key]).total_seconds() * 1000
+            if time_diff > 750:
+                del bridge_timeout[key]
+                reset_count += 1
+        if reset_count > 0:
+            bpdu = BPDU(my_id, 0, my_id, 0)
+            src_to_port = {}
+            src_timeout = {}
+            time_out = datetime.datetime.now()
+            for send_bpdu_port in ports:
+                send_bpdu_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
+
+        # BPDU send timer
         time_diff = datetime.datetime.now() - time_out
         total_milliseconds = time_diff.total_seconds() * 1000
-        if total_milliseconds > 750:
+        if total_milliseconds > 500:
             time_out = datetime.datetime.now()
             for send_port in ports:
                 send_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
@@ -123,7 +138,7 @@ def main(argv):
                 msg_id = full_msg['id']
                 if msg_id in seen_before:
                     continue
-                seen_before.append(msg_id)
+                #seen_before.append(msg_id)
                 src_to_port[src] = read_port
                 src_timeout[src] = datetime.datetime.now()
                 # if destination in forwarding table, and table is up-to-date
@@ -136,10 +151,9 @@ def main(argv):
                 # destination is not currently in forwarding table
                 else:
                     k = 0
-                    for port in ports:
-                        if ports_on[port] and port != read_port:
-                            k += 1
-                            port.send(json_data)
+                    for port in (x for x in ports if (ports_on[x] and x != read_port)):
+                        k += 1
+                        port.send(json_data)
                     if k == 0:
                         if print_toggle:
                             print 'Not forwarding message {} from port {}'.format(msg_id, src_to_port[src].fileno())
@@ -150,6 +164,7 @@ def main(argv):
             elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
+                bridge_timeout[src] = datetime.datetime.now()
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
