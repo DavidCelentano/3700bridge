@@ -103,8 +103,11 @@ def main(argv):
             if time_diff > 750:
                 del bridge_timeout[key]
                 reset_count += 1
+
+        # reset if necessary
         if reset_count > 0:
             bpdu = BPDU(my_id, 0, my_id, 0)
+            ports = [True for port in ports]
             src_to_port = {}
             src_timeout = {}
             time_out = datetime.datetime.now()
@@ -132,22 +135,28 @@ def main(argv):
             type = data['type']
             # contents of message
             full_msg = data['message']
+
             # if type is host data
             if type == 'data' and ports_on[read_port]:
                 # random id for message
                 msg_id = full_msg['id']
-                if msg_id in seen_before:
+                # the cheap way out
+                '''if msg_id in seen_before:
                     continue
-                #seen_before.append(msg_id)
+                seen_before.append(msg_id)'''
+                # record in forwarding table
                 src_to_port[src] = read_port
+                # reset timer on host
                 src_timeout[src] = datetime.datetime.now()
-                # if destination in forwarding table, and table is up-to-date
-                if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() <= 5 \
-                        and ports_on[src_to_port[dest]]:
+                src_time_diff = (datetime.datetime.now() - src_timeout[dest]).total_seconds()
+                # if destination in forwarding table, and table is up-to-date, and port is open
+                if dest in src_to_port and src_time_diff <= 5 and ports_on[src_to_port[dest]]:
+                    dest_port = src_to_port[dest]
                     if print_toggle:
-                        print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_to_port[src].fileno(),
-                                                                                 src_to_port[dest].fileno())
-                    src_to_port[dest].send(json_data)
+                        src_no = src_to_port[src].fileno()
+                        dest_no = dest_port.fileno()
+                        print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_no, dest_no)
+                    dest_port.send(json_data)
                 # destination is not currently in forwarding table
                 else:
                     k = 0
@@ -160,6 +169,7 @@ def main(argv):
                     else:
                         if print_toggle:
                             print 'Broadcasting message {} to all ports except {}'.format(msg_id, src_to_port[src].fileno())
+
             # received BPDU
             elif type == 'bpdu':
                 rt = full_msg['root']
@@ -170,6 +180,8 @@ def main(argv):
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
                     # change own BPDU state
                     bpdu = BPDU(src, read_port, rt, cost + 1)
+                    # reset closed ports
+                    ports_on = [True for port in ports]
                     src_to_port = {}
                     src_timeout = {}
                     # send out update to all BPDU neighbors
