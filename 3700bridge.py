@@ -38,24 +38,24 @@ def main(argv):
 
     # bridge id
     my_id = argv[0]
+    # print or not
+    print_toggle = True
     # initial lan addresses
     lan_args = argv[1:]
     # list of ports
     ports = []
-    # map of file descriptor to ports
-    file_no_to_port = {}
+    # seen before
+    seen_before = []
     # map of ports to lan number
     port_to_lan = {}
     # map of lans to ports
     lan_to_port = {}
     # map of sources to times
     src_timeout = {}
-    # port activation status
-    ports_on = {}
     # map of sources to ports
     src_to_port = {}
-    # port to designated bridge
-    port_to_des_bridge = {}
+    # port activation status
+    ports_on = {}
 
     # stored BPDU: assume self is the root
     bpdu = BPDU(my_id, 0, my_id, 0)
@@ -64,32 +64,26 @@ def main(argv):
 
     # creates all ports and connects to them
     for x in range(len(lan_args)):
+        lan = lan_args[x]
         # if connected to same LAN multiple times, disable extras
-        if lan_args[x] in lan_to_port:
+        if lan[-1:] in lan_to_port:
             continue
         # connect to port
         s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
-        s.connect(pad(lan_args[x]))
+        s.connect(pad(lan))
         # record socket obj
         ports.append(s)
         # associate socket obj with LAN
-        port_to_lan[s] = lan_args[x]
-        # for opposite of s.fileno
-        file_no_to_port[s.fileno()] = s
+        port_to_lan[s] = lan[-1:]
         # associate LAN with socket obj
-        lan_to_port[lan_args[x]] = s
-        # seen before
-        seen_before = []
+        lan_to_port[lan[-1:]] = s
         # by default, keep port open
         ports_on[s] = True
-        port_to_des_bridge[s] = my_id
 
     # ready print
     print 'Bridge ' + my_id + ' starting up' + ' The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
-    # initialize ports to read and write to
-    ready_read, ready_write, ignore2 = select.select(ports, ports, [], 1)
     # initial BPDU send
-    for r in ready_write:
+    for r in ports:
         r.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
 
     # for initial BPDU configuration
@@ -100,14 +94,14 @@ def main(argv):
     while True:
         # Calls select with all the ports; change the timeout value (1)
         # Reinitialize list of ready ports
-        ready_read, ready_write, ignore2 = select.select(ports, ports, [], 0.1)
+        ready_read, ignore, ignore2 = select.select(ports, ports, [], 0.1)
 
         # BPDU send timer (if BPDU times out)
         time_diff = datetime.datetime.now() - time_out
         total_milliseconds = time_diff.total_seconds() * 1000
         if total_milliseconds > 750:
             time_out = datetime.datetime.now()
-            for x in ready_write:
+            for x in ports:
                 x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
 
         # Reads from each of the ready ports
@@ -123,38 +117,39 @@ def main(argv):
             type = data['type']
             # contents of message
             full_msg = data['message']
-            # if type is host to host data
+            # if type is host data
             if type == 'data' and ports_on[x]:
                 # random id for message
                 msg_id = full_msg['id']
                 if msg_id in seen_before:
                     continue
-                #seen_before.append(msg_id)
+                seen_before.append(msg_id)
                 src_to_port[src] = x
                 src_timeout[src] = datetime.datetime.now()
                 # if destination in forwarding table, and table is up-to-date
                 if dest in src_to_port and (datetime.datetime.now() - src_timeout[dest]).total_seconds() <= 5 \
-                        and ports_on[src_to_port[dest]] and src_to_port[dest] in ready_write:
-                    print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_to_port[src].fileno(), src_to_port[dest].fileno())
+                        and ports_on[src_to_port[dest]]:
+                    if print_toggle:
+                        print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_to_port[src].fileno(),
+                                                                                 src_to_port[dest].fileno())
                     src_to_port[dest].send(json_data)
                 # destination is not currently in forwarding table
                 else:
                     k = 0
-                    for s in ready_write:
-                        if ports_on[s] and not(s is x):
+                    for port in ports:
+                        if ports_on[port] and port != x:
                             k += 1
-                            s.send(json_data)
+                            port.send(json_data)
                     if k == 0:
-                        print 'Not forwarding message {} from port {}'.format(msg_id, src_to_port[src].fileno())
+                        if print_toggle:
+                            print 'Not forwarding message {} from port {}'.format(msg_id, src_to_port[src].fileno())
                     else:
-                        print 'Broadcasting message {} to all ports except {}'.format(msg_id, src_to_port[src].fileno())
+                        if print_toggle:
+                            print 'Broadcasting message {} to all ports except {}'.format(msg_id, src_to_port[src].fileno())
             # received BPDU
             elif type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
-                # if more correct BPDU
-                if port_to_lan[x] != port_to_lan[bpdu.rt_port] and (cost < bpdu.cost or (cost == bpdu.cost and src < my_id)):
-                   ports_on[x] = False
                 if rt < bpdu.rt \
                         or (rt == bpdu.rt and (cost < (bpdu.cost - 1))) \
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
@@ -162,12 +157,15 @@ def main(argv):
                     bpdu = BPDU(src, x, rt, cost + 1)
                     src_to_port = {}
                     src_timeout = {}
-                    port_to_des_bridge[x] = bpdu.bridge_id
                     # send out update to all BPDU neighbors
-                    for x in ready_write:
+                    for x in ports:
                        x.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
                     # reset timeout timer
                     time_out = datetime.datetime.now()
+                # port closing
+
+
+
 
 
 if __name__ == "__main__":
