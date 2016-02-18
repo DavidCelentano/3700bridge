@@ -39,7 +39,7 @@ def main(argv):
     # bridge id
     my_id = argv[0]
     # print or not
-    print_toggle = False
+    print_toggle = True
     if my_id == '9a3a':
         print_toggle = True
     # initial lan addresses
@@ -150,7 +150,7 @@ def main(argv):
                 now = datetime.datetime.now()
                 src_timeout[src] = now
                 if print_toggle:
-                    print 'Received message {} on port {} from {} to {}'.format(msg_id, port.fileno(), src, dest)
+                    print 'Received message {} on port {} from {} to {}'.format(msg_id, read_port.fileno(), src, dest)
                 # if destination in forwarding table, and table is up-to-date, and port is open
                 if dest in src_to_port and (now - src_timeout[dest]).total_seconds() <= 5 and ports_on[src_to_port[dest]]:
                     dest_port = src_to_port[dest]
@@ -204,10 +204,12 @@ def main(argv):
                     des_bridge_flags[read_port] = False
                     if read_port != bpdu.rt_port and ports_on[read_port] == True:
                         ports_on[read_port] = False
-                        print 'Disabled port: {} to LAN {}'.format(read_port.fileno(), port_to_lan[read_port])
-                    if print_toggle:
-                        print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
+                        if print_toggle:
+                            print 'Disabled port: {} to LAN {}'.format(read_port.fileno(), port_to_lan[read_port])
+                        if print_toggle:
+                            print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 else:
+                    ports_on[read_port] = True
                     if print_toggle:
                         print '{} is the designated bridge for LAN {} my: {} {} yours: {} {}'.format(my_id, port_to_lan[read_port], bpdu.cost, my_id, cost, src)
                 if print_toggle:
