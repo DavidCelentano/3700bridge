@@ -39,8 +39,8 @@ def main(argv):
     # bridge id
     my_id = argv[0]
     # print or not
-    print_toggle = True
-    if my_id == '0129':
+    print_toggle = False
+    if my_id == '9a3a':
         print_toggle = True
     # initial lan addresses
     lan_args = argv[1:]
@@ -187,6 +187,9 @@ def main(argv):
                         or (rt == bpdu.rt and (cost == bpdu.cost - 1) and src < bpdu.bridge_id):
                     # change own BPDU state
                     bpdu = BPDU(src, read_port, rt, cost + 1)
+                    if print_toggle:
+                        print 'New root: {}/{}'.format(bpdu.bridge_id, bpdu.rt)
+                        print 'Root port: {}/{}'.format(bpdu.bridge_id, bpdu.rt_port.fileno())
                     src_to_port = {}
                     src_timeout = {}
                     # send out update to all BPDU neighbors
@@ -196,17 +199,17 @@ def main(argv):
                     time_out = datetime.datetime.now()
                     des_bridge_flags[read_port] = False
                     if print_toggle:
-                        print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
+                        print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 elif (rt == bpdu.rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
                     des_bridge_flags[read_port] = False
                     if print_toggle:
-                        print 'I am not the designated bridge for LAN {}'.format(port_to_lan[read_port])
+                        print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 else:
                     if print_toggle:
-                        print 'I am the designated bridge for LAN {} my: {} {} yours: {} {}'.format(port_to_lan[read_port], bpdu.cost, my_id, cost, src)
+                        print '{} is the designated bridge for LAN {} my: {} {} yours: {} {}'.format(my_id, port_to_lan[read_port], bpdu.cost, my_id, cost, src)
                 if print_toggle:
-                    print 'the root is {} and my cost is {}'.format(bpdu.rt, bpdu.cost)
-            else:
+                    print 'the root is {} and my cost is {} and my LANs: {} are {}'.format(bpdu.rt, bpdu.cost, port_to_lan.values(), ports_on.values())
+            elif msg_type != 'data':
                 raise RuntimeWarning('Malformed message: being discarded')
 
         for port in ports:
@@ -214,7 +217,7 @@ def main(argv):
                 if ports_on[port]:
                     ports_on[port] = False
                     if print_toggle:
-                        print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
+                        print 'Disabled port: {} to LAN {}'.format(port.fileno(), port_to_lan[port])
             elif not ports_on[port]:
                 ports_on[port] = True
                 #if print_toggle:
