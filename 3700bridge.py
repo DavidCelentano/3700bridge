@@ -209,7 +209,7 @@ def main(argv):
                         if print_toggle:
                             print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 else:
-                    ports_on[read_port] = True
+                    #ports_on[read_port] = True
                     if print_toggle:
                         print '{} is the designated bridge for LAN {} my: {} {} yours: {} {}'.format(my_id, port_to_lan[read_port], bpdu.cost, my_id, cost, src)
                 if print_toggle:
