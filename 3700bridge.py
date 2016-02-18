@@ -141,6 +141,8 @@ def main(argv):
             msg_type = data['type']
             # contents of message
             full_msg = data['message']
+            if read_port not in port_to_bridge:
+                port_to_bridge[read_port] = bpdu
 
             # if type is host data
             if msg_type == 'data' and ports_on[read_port]:
@@ -202,8 +204,8 @@ def main(argv):
                     des_bridge_flags[read_port] = False
                     if print_toggle:
                         print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
-                elif (rt == bpdu.rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
-                    port_to_bridge[read_port] = form_bpdu('x', rt, cost) # do we have the name of the bridge that sent the BPDU?
+                elif (rt == port_to_bridge[read_port].rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
+                    port_to_bridge[read_port] = form_bpdu(src, rt, cost) 
                     des_bridge_flags[read_port] = False
                     if read_port != bpdu.rt_port and ports_on[read_port] == True:
                         ports_on[read_port] = False
