@@ -202,6 +202,9 @@ def main(argv):
                         print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 elif (rt == bpdu.rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
                     des_bridge_flags[read_port] = False
+                    if read_port != bpdu.rt_port and ports_on[read_port] == True:
+                        ports_on[read_port] = False
+                        print 'Disabled port: {} to LAN {}'.format(read_port.fileno(), port_to_lan[read_port])
                     if print_toggle:
                         print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 else:
@@ -212,18 +215,6 @@ def main(argv):
             elif msg_type != 'data':
                 raise RuntimeWarning('Malformed message: being discarded')
 
-        for port in ports:
-            if not(des_bridge_flags[port]) and port != bpdu.rt_port:
-                if ports_on[port]:
-                    ports_on[port] = False
-                    if print_toggle:
-                        print 'Disabled port: {} to LAN {}'.format(port.fileno(), port_to_lan[port])
-            elif not ports_on[port]:
-                ports_on[port] = True
-                #if print_toggle:
-                    #print 'not closing port {} to LAN {} des bridge: {}'.format(port.fileno(), port_to_lan[port], des_bridge_flags[port])
-            else:
-                continue
 
 if __name__ == "__main__":
     main(sys.argv[1:])
