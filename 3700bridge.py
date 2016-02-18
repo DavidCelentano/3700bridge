@@ -48,6 +48,8 @@ def main(argv):
     ports = []
     # map of ports to lan number
     port_to_lan = {}
+    # map of ports to their dedicated bridges
+    port_to_bridge = {}
     # map of lans to ports
     lan_to_port = {}
     # map of sources to times
@@ -103,10 +105,10 @@ def main(argv):
             time_stamp = datetime.datetime.now()
             time_diff = (time_stamp - bridge_timeout[key]).total_seconds() * 1000
             if time_diff > 750:
-                del bridge_timeout[key]
+                del bridge_timeout[key] # the name of the dropped bridge
                 reset_count += 1
 
-        # reset if necessary
+        # reset if necessary (assumes a bridge drop)
         if reset_count > 0:
             bpdu = BPDU(my_id, 0, my_id, 0)
             src_to_port = {}
@@ -201,6 +203,7 @@ def main(argv):
                     if print_toggle:
                         print '{} is not the designated bridge for LAN {}'.format(my_id, port_to_lan[read_port])
                 elif (rt == bpdu.rt and cost < bpdu.cost) or (rt == bpdu.rt and cost == bpdu.cost and src < my_id):
+                    port_to_bridge[read_port] = form_bpdu('x', rt, cost) # do we have the name of the bridge that sent the BPDU?
                     des_bridge_flags[read_port] = False
                     if read_port != bpdu.rt_port and ports_on[read_port] == True:
                         ports_on[read_port] = False
