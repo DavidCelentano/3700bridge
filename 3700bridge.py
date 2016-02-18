@@ -16,9 +16,9 @@ def pad(name):
 
 
 # form the bpdu to be sent
-def form_bpdu(id, rt, cost):
-    return json.dumps({'source': id, 'dest': 'ffff', 'type': 'bpdu',
-                       'message':{'root': rt, 'cost': cost}})
+def form_bpdu(cur_id, rt, cost):
+    return json.dumps({'source': cur_id, 'dest': 'ffff', 'type': 'bpdu',
+                       'message': {'root': rt, 'cost': cost}})
 
 
 # creates bridge
@@ -39,15 +39,13 @@ def main(argv):
     # bridge id
     my_id = argv[0]
     # print or not
-    print_toggle = False
-    if my_id == 'ff1a':
-        print_toggle = False
+    print_toggle = True
+    if my_id == '0129':
+        print_toggle = True
     # initial lan addresses
     lan_args = argv[1:]
     # list of ports
     ports = []
-    # seen before
-    seen_before = []
     # map of ports to lan number
     port_to_lan = {}
     # map of lans to ports
@@ -84,7 +82,7 @@ def main(argv):
         des_bridge_flags[s] = True
 
     # ready print
-    print 'Bridge ' + my_id + ' starting up' + ' The root is {} and the cost is {}'.format(bpdu.rt, bpdu.cost)
+    print 'Bridge {} starting up'.format(my_id)
     # initial BPDU send
     for r in ports:
         r.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
@@ -138,32 +136,34 @@ def main(argv):
             # sending to
             dest = data['dest']
             # msg type
-            type = data['type']
+            msg_type = data['type']
             # contents of message
             full_msg = data['message']
 
             # if type is host data
-            if type == 'data' and ports_on[read_port]:
+            if msg_type == 'data' and ports_on[read_port]:
                 # random id for message
                 msg_id = full_msg['id']
-                # the cheap way out
-                '''if msg_id in seen_before:
-                    continue
-                seen_before.append(msg_id)'''
                 # record in forwarding table
                 src_to_port[src] = read_port
                 # reset timer on host
                 now = datetime.datetime.now()
                 src_timeout[src] = now
+                if print_toggle:
+                    print 'Received message {} on port {} from {} to {}'.format(msg_id, port.fileno(), src, dest)
                 # if destination in forwarding table, and table is up-to-date, and port is open
                 if dest in src_to_port and (now - src_timeout[dest]).total_seconds() <= 5 and ports_on[src_to_port[dest]]:
                     dest_port = src_to_port[dest]
-                    if print_toggle:
-                        src_no = src_to_port[src].fileno()
-                        dest_no = dest_port.fileno()
-                        print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_no, dest_no)
                     if dest_port != read_port:
+                        if print_toggle:
+                            src_no = read_port.fileno()
+                            dest_no = dest_port.fileno()
+                            print 'Forwarding message {} from port {} to port {}'.format(msg_id, src_no, dest_no)
                         dest_port.send(json_data)
+                    else:
+                        if print_toggle:
+                            print 'Not forwarding message {} from port {}'.format(msg_id, read_port.fileno())
+
                 # destination is not currently in forwarding table
                 else:
                     k = 0
@@ -172,13 +172,13 @@ def main(argv):
                         port.send(json_data)
                     if k == 0:
                         if print_toggle:
-                            print 'Not forwarding message {} from port {}'.format(msg_id, src_to_port[src].fileno())
+                            print 'Not forwarding message {} from port {}'.format(msg_id, read_port.fileno())
                     else:
                         if print_toggle:
-                            print 'Broadcasting message {} to all ports except {}'.format(msg_id, src_to_port[src].fileno())
+                            print 'Broadcasting message {} to all ports except {}'.format(msg_id, read_port.fileno())
 
             # received BPDU
-            elif type == 'bpdu':
+            elif msg_type == 'bpdu':
                 rt = full_msg['root']
                 cost = full_msg['cost']
                 bridge_timeout[src] = datetime.datetime.now()
@@ -191,7 +191,7 @@ def main(argv):
                     src_timeout = {}
                     # send out update to all BPDU neighbors
                     for every_port in ports:
-                       every_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
+                        every_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
                     # reset timeout timer
                     time_out = datetime.datetime.now()
                     des_bridge_flags[read_port] = False
@@ -204,16 +204,23 @@ def main(argv):
                 else:
                     if print_toggle:
                         print 'I am the designated bridge for LAN {} my: {} {} yours: {} {}'.format(port_to_lan[read_port], bpdu.cost, my_id, cost, src)
+                if print_toggle:
+                    print 'the root is {} and my cost is {}'.format(bpdu.rt, bpdu.cost)
+            else:
+                raise RuntimeWarning('Malformed message: being discarded')
 
         for port in ports:
             if not(des_bridge_flags[port]) and port != bpdu.rt_port:
-                ports_on[port] = False
-                if print_toggle:
-                    print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
-            else:
+                if ports_on[port]:
+                    ports_on[port] = False
+                    if print_toggle:
+                        print 'Closing port {} ({}) to LAN {}'.format(port.fileno(), port, port_to_lan[port])
+            elif not ports_on[port]:
                 ports_on[port] = True
-                if print_toggle:
-                    print 'not closing port {} to LAN {} des bridge: {}'.format(port.fileno(), port_to_lan[port], des_bridge_flags[port])
+                #if print_toggle:
+                    #print 'not closing port {} to LAN {} des bridge: {}'.format(port.fileno(), port_to_lan[port], des_bridge_flags[port])
+            else:
+                continue
 
 if __name__ == "__main__":
     main(sys.argv[1:])
