@@ -40,8 +40,6 @@ def main(argv):
     my_id = argv[0]
     # print or not
     print_toggle = True
-    if my_id == '9a3a':
-        print_toggle = True
     # id of bridge on root port
     root_port_bridge = my_id
     # initial lan addresses
@@ -219,8 +217,6 @@ def main(argv):
                         every_port.send(form_bpdu(my_id, bpdu.rt, bpdu.cost))
                     # reset timeout timer
                     time_out = datetime.datetime.now()
-                    '''if print_toggle:
-                        print '{} is not the designated bridge for LAN {}'.format(my_id, port_lan)'''
                 # for upcoming if
                 less_rt = rt < des_bridge.rt
                 equal_rt = rt == des_bridge.rt
@@ -237,7 +233,8 @@ def main(argv):
                             ports_on[read_port] = False
                             if print_toggle:
                                 print 'Disabled port: {} to LAN {}'.format(r_port_no, port_lan)
-                    elif True: #not (ports_on[read_port]):
+                    else:
+                        # this port should be open
                         ports_on[read_port] = True
                         if print_toggle:
                                 print 'Enabled port: {} to LAN {}'.format(r_port_no, port_lan)
@@ -247,17 +244,15 @@ def main(argv):
                 # check if I am the designated bridge for this port
                 elif bpdu.rt < des_bridge.rt or (bpdu.rt == des_bridge.rt and bpdu.cost < des_bridge.cost) \
                      or (bpdu.rt == des_bridge.rt and bpdu.cost == des_bridge.cost and my_id < des_bridge.bridge_id):
+                    # I am the designated bridge
                     port_to_bridge[read_port] = bpdu
+                    # This port must stay open
                     ports_on[read_port] = True
                     if print_toggle:
                         print 'Enabled port: {} to LAN {}'.format(r_port_no, port_lan)
                         print '{} is the designated bridge for ' \
                               'LAN {} {}: {} {}: {}'.format(my_id, port_lan, my_id, bpdu.cost, des_bridge.bridge_id, des_bridge.cost)
 
-                if print_toggle:
-                    print 'the root is {} and ' \
-                          'my cost is {} and my LANs: {} are {}'.format(bpdu.rt, bpdu.cost, port_to_lan.values()[1:],
-                                                                        ports_on.values())
             elif msg_type != 'data':
                 raise RuntimeWarning('Malformed message: being discarded')
 
