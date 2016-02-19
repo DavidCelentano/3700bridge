@@ -205,8 +205,10 @@ def main(argv):
                     # change own BPDU state
                     bpdu = BPDU(my_id, rt, cost + 1, read_port.fileno())
                     root_port_bridge = src
+                    # reset designated bridges
                     for k in port_to_bridge:
                         port_to_bridge[k] = bpdu
+                        ports_on[k] = True
                     if print_toggle:
                         print 'New root: {}/{}'.format(my_id, bpdu.rt)
                         print 'Root port: {}/{}'.format(my_id, bpdu.rt_port)
@@ -235,7 +237,7 @@ def main(argv):
                             ports_on[read_port] = False
                             if print_toggle:
                                 print 'Disabled port: {} to LAN {}'.format(r_port_no, port_lan)
-                    elif not (ports_on[read_port]):
+                    elif True: #not (ports_on[read_port]):
                         ports_on[read_port] = True
                         if print_toggle:
                                 print 'Enabled port: {} to LAN {}'.format(r_port_no, port_lan)
@@ -248,6 +250,7 @@ def main(argv):
                     port_to_bridge[read_port] = bpdu
                     ports_on[read_port] = True
                     if print_toggle:
+                        print 'Enabled port: {} to LAN {}'.format(r_port_no, port_lan)
                         print '{} is the designated bridge for ' \
                               'LAN {} {}: {} {}: {}'.format(my_id, port_lan, my_id, bpdu.cost, des_bridge.bridge_id, des_bridge.cost)
 
