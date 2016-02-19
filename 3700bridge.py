@@ -215,8 +215,6 @@ def main(argv):
                     time_out = datetime.datetime.now()
                     '''if print_toggle:
                         print '{} is not the designated bridge for LAN {}'.format(my_id, port_lan)'''
-                if bpdu.rt_port == read_port.fileno() and not (ports_on[read_port]):
-                    ports_on[read_port] = True
                 # for upcoming if
                 less_rt = rt < des_bridge.rt
                 equal_rt = rt == des_bridge.rt
@@ -234,7 +232,7 @@ def main(argv):
                             if print_toggle:
                                 print 'Disabled port: {} to LAN {}'.format(r_port_no, port_lan)
                     elif not (ports_on[read_port]):
-                        ports_on[True] = True
+                        ports_on[read_port] = True
                         if print_toggle:
                                 print 'Enabled port: {} to LAN {}'.format(r_port_no, port_lan)
                     if print_toggle:
@@ -255,6 +253,7 @@ def main(argv):
                                                                         ports_on.values())
             elif msg_type != 'data':
                 raise RuntimeWarning('Malformed message: being discarded')
+
 
 
 if __name__ == "__main__":
