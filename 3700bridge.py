@@ -140,6 +140,8 @@ def main(argv):
 
         # Reads from each of the ready ports
         for read_port in ready_read:
+            if bpdu.rt_port == read_port.fileno() and not (ports_on[read_port]):
+                    ports_on[read_port] = True
             # JSON decoding
             json_data = read_port.recv(1500)
             data = json.loads(json_data)
@@ -203,6 +205,8 @@ def main(argv):
                     # change own BPDU state
                     bpdu = BPDU(my_id, rt, cost + 1, read_port.fileno())
                     root_port_bridge = src
+                    for k in port_to_bridge:
+                        port_to_bridge[k] = bpdu
                     if print_toggle:
                         print 'New root: {}/{}'.format(my_id, bpdu.rt)
                         print 'Root port: {}/{}'.format(my_id, bpdu.rt_port)
